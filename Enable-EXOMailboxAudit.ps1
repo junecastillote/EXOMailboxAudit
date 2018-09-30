@@ -56,7 +56,7 @@ $onLineCredential = Import-Clixml "$($script_root)\Office365StoredCredential.xml
 $sendEmail = $true
 $sender = "Office 365 Report <office365report@lazyexchangeadmin.com>"
 $recipients = "june.castillote@lazyexchangeadmin.com"
-$subject = "[Office 365] Enable Non-Owner Mailbox Audit"
+$subject = "[Office 365] Enable Mailbox Audit Task"
 $smtpServer = "smtp.office365.com"
 $smtpPort = "587"
 #mail variables>
@@ -83,7 +83,7 @@ if ($mailboxes){
 	foreach ($mailbox in $mailboxes)
 	{
 		Write-Host (Get-Date) ":          -->> $($mailbox.PrimarySMTPAddress)" -ForegroundColor Green
-		#Set-Mailbox $mailbox.PrimarySMTPAddress -AuditEnabled $true -AuditLogAgeLimit 180 -AuditAdmin Update, MoveToDeletedItems, SoftDelete, HardDelete, SendAs, SendOnBehalf, Create, UpdateFolderPermission -AuditDelegate Update, SoftDelete, HardDelete, SendAs, Create, UpdateFolderPermissions, MoveToDeletedItems, SendOnBehalf -AuditOwner UpdateFolderPermission, MailboxLogin, Create, SoftDelete, HardDelete, Update, MoveToDeletedItems 
+		Set-Mailbox $mailbox.PrimarySMTPAddress -AuditEnabled $true -AuditLogAgeLimit 180 -AuditAdmin Update, MoveToDeletedItems, SoftDelete, HardDelete, SendAs, SendOnBehalf, Create, UpdateFolderPermission -AuditDelegate Update, SoftDelete, HardDelete, SendAs, Create, UpdateFolderPermissions, MoveToDeletedItems, SendOnBehalf -AuditOwner UpdateFolderPermission, MailboxLogin, Create, SoftDelete, HardDelete, Update, MoveToDeletedItems 
 	}
 
 	if ($sendEmail -eq $true)
