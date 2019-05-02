@@ -2,6 +2,5 @@ log*.txt
 debug*.txt
 output*.csv
 output*.txt
-Main.ps1
 exclusionList.txt
 *.xml
