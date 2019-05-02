@@ -1,97 +1,247 @@
-<#	
-	.NOTES
-	===========================================================================
-	 Created on:   	7-August-2018
-	 Created by:   	June Castillote
-					june.castillote@gmail.com
-	 Filename:     	Enable-EXOMailboxAudit.ps1
-	 Version:		1.0 (7-August-2018)
-	===========================================================================
+<#PSScriptInfo
 
-	.LINK
-		https://www.lazyexchangeadmin.com/2018/09/EnableEXOMailboxAudit.html
+.VERSION 1.1
 
-	.SYNOPSIS
-		Use Enable-EXOMailboxAudit.ps1 to enable non mailbox owner access auditing on all mailboxes, with reporting.
+.GUID 4bfcebec-6432-4a11-9f5c-5cb9f98f8420
 
-	.DESCRIPTION
-		This will enable the Non-Owner Mailbox Audit, and will create a report of mailboxes that were enabled for audit.
-		
-	.EXAMPLE
-		.\Enable-EXOMailboxAudit.ps1
+.AUTHOR June Castillote
+
+.COMPANYNAME www.lazyexchangeadmin.com
+
+.COPYRIGHT june.castillote@gmail.com
+
+.TAGS Office365 Script PowerShell Tool Report Export Audit Mailbox
+
+.LICENSEURI
+
+.PROJECTURI https://github.com/junecastillote/Enable-EXOMailboxAudit
+
+.ICONURI
+
+.EXTERNALMODULEDEPENDENCIES 
+
+.REQUIREDSCRIPTS
+
+.EXTERNALSCRIPTDEPENDENCIES
+
+.RELEASENOTES
+	
+.PRIVATEDATA
 
 #>
 
-$scriptVersion = "1.0"
+<#	
+	.DESCRIPTION
+	This will enable the Non-Owner Mailbox Audit, and will create a report of mailboxes that were enabled for audit.
+	
+	.SYNOPSIS
+	Use Enable-EXOMailboxAudit.ps1 to enable non mailbox owner access auditing on all mailboxes, with reporting.
+		
+	.EXAMPLE
+	.\Enable-EXOMailboxAudit.ps1
+#>
+Param(
+        # office 365 credential
+        # you can pass the credential using variable ($credential = Get-Credential)
+        # then use parameter like so: -credential $credential
+        # OR created an encrypted XML (Get-Credential | export-clixml <file.xml>)
+        # then use parameter like so: -credential (import-clixml <file.xml>)
+        [Parameter(Mandatory=$true,Position=0)]
+        [pscredential]$credential,        
 
-#Function to create new EXO Session
-Function New-EXOSession()
-{
-	param([parameter(mandatory=$true)]$exoCredential)
+        #path to the output directory (eg. c:\scripts\output)
+        [Parameter(Mandatory=$true,Position=1)]
+		[string]$outputDirectory,
+		
+		#limit the result
+        [Parameter(Mandatory=$true,position=2)]
+		$resultSizeLimit,
+		
+		[Parameter(Mandatory=$true,position=3)]
+		$AuditLogAgeLimit,
 
-	#discard all PSSession
-	Get-PSSession | Remove-PSSession -Confirm:$false
+        #path to the log directory (eg. c:\scripts\logs)
+        [Parameter()]
+        [string]$logDirectory,
+        
+        #Sender Email Address
+        [Parameter()]
+        [string]$sender,
 
-	#create new Exchange Online Session
-	$EXOSession = New-PSSession -ConfigurationName "Microsoft.Exchange" -ConnectionUri 'https://ps.outlook.com/powershell' -Credential $exoCredential -Authentication Basic -AllowRedirection
-	$office365_Session = Import-PSSession $EXOSession -DisableNameChecking
-}
+        #Recipient Email Addresses - separate with comma
+        [Parameter()]
+        [string[]]$recipients,
 
-$enableDebug = $true
+        #Switch to enable email report
+        [Parameter()]
+        [switch]$sendEmail,
+
+        #Delete older files (in days)
+        [Parameter()]
+		[int]$removeOldFiles,
+		
+		#Exclusion List
+		[Parameter()]
+		[string[]]$exclusionList,
+
+		#Test Mode
+		[Parameter()]
+		[switch]$testMode        
+)
 
 $script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 
-#Start Debug Log
-if ($enableDebug) {Start-Transcript -Path ($script_root + "\debugLog.txt") -Append}
+Stop-TxnLogging
+Clear-Host
+$scriptInfo = Test-ScriptFileInfo -Path $MyInvocation.MyCommand.Definition
 
-#<O365 CREDENTIALS
-#Note: This uses an encrypted credential (XML). To store the credential:
-#1. Login to the Server/Computer using the account that will be used to run the script/task
-#2. Run this "Get-Credential | Export-CliXml Office365StoredCredential.xml"
-#3. Make sure that Office365StoredCredential.xml is in the same folder as the script.
-$onLineCredential = Import-Clixml "$($script_root)\Office365StoredCredential.xml"
-#O365 CREDENTIALS>
+
+#parameter check ----------------------------------------------------------------------------------------------------
+$isAllGood = $true
+
+if ($sendEmail)
+{
+    if (!$sender)
+    {
+        Write-Host "ERROR: A valid sender email address is not specified." -ForegroundColor Yellow
+        $isAllGood = $false
+    }
+
+    if (!$recipients)
+    {
+        Write-Host "ERROR: No recipients specified." -ForegroundColor Yellow
+        $isAllGood = $false
+    }
+}
+
+if ($isAllGood -eq $false)
+{
+    EXIT
+}
+#----------------------------------------------------------------------------------------------------
+
+#Import Functions
+. "$script_root\Functions.ps1"
+
+#Set Paths-------------------------------------------------------------------------------------------
+$Today=Get-Date
+[string]$fileSuffix = '{0:dd-MMM-yyyy_hh-mm_tt}' -f $Today
+$logFile = "$($logDirectory)\Log_$($fileSuffix).txt"
+
+#Create folders if not found
+if ($logDirectory)
+{
+    if (!(Test-Path $logDirectory)) 
+    {
+        New-Item -ItemType Directory -Path $logDirectory | Out-Null
+        #start transcribing----------------------------------------------------------------------------------
+        Start-TxnLogging $logFile
+        #----------------------------------------------------------------------------------------------------
+    }
+	else
+	{
+		Start-TxnLogging $logFile
+	}
+}
+
+if (!(Test-Path $outputDirectory)) 
+{
+	New-Item -ItemType Directory -Path $outputDirectory | Out-Null
+}
+#----------------------------------------------------------------------------------------------------
 
 #<mail variables
-$sendEmail = $true
-$sender = "Office 365 Report <office365report@lazyexchangeadmin.com>"
-$recipients = "june.castillote@lazyexchangeadmin.com"
-$subject = "[Office 365] Enable Mailbox Audit Task"
+$subject = "Enable Mailbox Audit Task"
 $smtpServer = "smtp.office365.com"
 $smtpPort = "587"
 #mail variables>
 
+if ($testMode)
+{
+	Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ': TEST MODE ' -ForegroundColor Yellow
+}
 #open new Exchange Online Session
-Write-Host (Get-Date) ': Login to Exchange Online... ' -ForegroundColor Yellow
-New-EXOSession $onlineCredential
+Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ': Login to Exchange Online... ' -ForegroundColor Yellow
+
+#Connect to O365 Shell
+try 
+{
+    New-EXOSession $credential
+}
+catch 
+{
+    Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": There was an error connecting to Exchange Online. Terminating Script" -ForegroundColor YELLOW
+    Stop-TxnLogging
+    EXIT
+}
+
+$tenantName = (Get-OrganizationConfig).DisplayName
 
 #Get all mailboxes with disabled auditing
-Write-Host (Get-Date) ': Retrieving Mailbox List... ' -ForegroundColor Yellow -NoNewLine
-$mailboxes = Get-Mailbox -ResultSize Unlimited -Filter {(RecipientTypeDetails -eq "UserMailbox" -or RecipientTypeDetails -eq "SharedMailbox" -or RecipientTypeDetails -eq "RoomMailbox" -or RecipientTypeDetails -eq "DiscoveryMailbox") -and (AuditEnabled -eq $false)} | Sort-Object PrimarySMTPAddress
-Write-Host 'Done' -ForegroundColor Green
+Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ': Retrieving Mailbox List... ' -ForegroundColor Yellow
+$mailboxes = Get-Mailbox -ResultSize $resultSizeLimit -Filter {(RecipientTypeDetails -eq "UserMailbox" -or RecipientTypeDetails -eq "SharedMailbox" -or RecipientTypeDetails -eq "RoomMailbox" -or RecipientTypeDetails -eq "DiscoveryMailbox") -and (AuditEnabled -eq $false)} | Sort-Object PrimarySMTPAddress
 $mailboxCount = ($mailboxes | Measure-Object).Count
-Write-Host (Get-Date) ": Found $($mailboxCount) with audit logs disabled" -ForegroundColor Yellow
+Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Found $($mailboxCount) with audit logs disabled" -ForegroundColor Yellow
+if ($exclusionList) {
+	Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Found $($exclusionList.count) from the Exclusion List" -ForegroundColor Yellow
+}
 
+$includedMailbox = 0
 if ($mailboxes){
 
-	$outputCsvFile = $script_root +"\EnableMailboxAudit$((get-date).tostring("yyyy_MM_dd-hh_mm_tt")).csv"
-	Write-Host (Get-Date) ": Saving Mailbox List to $($outputCsvFile)" -ForegroundColor Yellow
-	$mailboxes | Select-Object PrimarySMTPAddress | export-csv -nti $outputCsvFile
+	$outputFile = "$($outputDirectory)\output_$($fileSuffix).txt"
+	Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Saving Mailbox List to $($outputFile)" -ForegroundColor Yellow
+	#$mailboxes | Select-Object PrimarySMTPAddress | export-csv -nti $outputFile
 
-	Write-Host (Get-Date) ": Enable Mailbox Auditing" -ForegroundColor Yellow
+	Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Enable Mailbox Auditing" -ForegroundColor Yellow
 
 	foreach ($mailbox in $mailboxes)
 	{
-		Write-Host (Get-Date) ":          -->> $($mailbox.PrimarySMTPAddress)" -ForegroundColor Green
-		Set-Mailbox $mailbox.PrimarySMTPAddress -AuditEnabled $true -AuditLogAgeLimit 180 -AuditAdmin Update, MoveToDeletedItems, SoftDelete, HardDelete, SendAs, SendOnBehalf, Create, UpdateFolderPermission -AuditDelegate Update, SoftDelete, HardDelete, SendAs, Create, UpdateFolderPermissions, MoveToDeletedItems, SendOnBehalf -AuditOwner UpdateFolderPermission, MailboxLogin, Create, SoftDelete, HardDelete, Update, MoveToDeletedItems 
+		if ($exclusionList -and $exclusionList -contains "$($mailbox.PrimarySMTPAddress)")
+		{
+			Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ":          -->> $($mailbox.PrimarySMTPAddress) -- EXCLUDE" -ForegroundColor RED
+		}
+		else 
+		{
+			Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ":          -->> $($mailbox.PrimarySMTPAddress)" -ForegroundColor Green
+
+			if (!$testMode)
+			{
+				Set-Mailbox $mailbox.PrimarySMTPAddress -AuditEnabled $true -AuditLogAgeLimit $AuditLogAgeLimit -AuditAdmin Update, MoveToDeletedItems, SoftDelete, HardDelete, SendAs, SendOnBehalf, Create, UpdateFolderPermission -AuditDelegate Update, SoftDelete, HardDelete, SendAs, Create, UpdateFolderPermissions, MoveToDeletedItems, SendOnBehalf -AuditOwner UpdateFolderPermission, MailboxLogin, Create, SoftDelete, HardDelete, Update, MoveToDeletedItems	
+			}
+			$mailbox.PrimarySMTPAddress | Out-File $outputFile -Append
+			$includedMailbox = $includedMailbox+1
+		}		
 	}
 
-	if ($sendEmail -eq $true)
-		{
-			Write-Host (Get-Date) ": Sending Email Report" -ForegroundColor Yellow
-			$mailBody = "Attached is the list of mailboxes whose auditing were enabled by this script <br /><a href=""https://www.lazyexchangeadmin.com/2018/09/EnableEXOMailboxAudit.html"">Enable-EXOMailboxAudit.ps1 v$($scriptVersion)</a>"
-			Send-MailMessage -SmtpServer $smtpServer -Port $smtpPort -To $recipients -From $sender -Subject $subject -Body $mailBody -BodyAsHTML -Credential $onlineCredential -UseSSL -Attachments $outputCsvFile
+	if ($sendEmail -and $includedMailbox -gt 0)
+	{
+		Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Sending Email Report" -ForegroundColor Yellow
+		$mailBody = "Attached is the list of mailboxes whose auditing were enabled by this script <br /><a href=""$($scriptInfo.ProjectURI)"">$($scriptInfo.Name)</a> version $($scriptInfo.version)"
+		$mailParams = @{
+			smtpServer = $smtpServer
+			port = $smtpPort
+			to = $recipients
+			from = $sender
+			subject = "[$($tenantName)] $($subject)"
+			useSSL = $true
+			credential = $credential
+			body = $mailBody
+			bodyAsHTML = $true
+			Attachments = $outputFile
 		}
+		Send-MailMessage @mailParams
+	}
 }
 
-if ($enableDebug) {Stop-Transcript}
+#Invoke Housekeeping---------------------------------------------------------------------------------
+#if ($enableHousekeeping)
+if ($removeOldFiles)
+{
+	Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Deleting backup files older than $($removeOldFiles) days" -ForegroundColor Yellow
+	Invoke-Housekeeping -folderPath $outputDirectory -daysToKeep $removeOldFiles
+	Invoke-Housekeeping -folderPath $logDirectory -daysToKeep $removeOldFiles
+}
+#-----------------------------------------------------------------------------------------------
+
+Stop-TxnLogging
