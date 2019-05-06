@@ -53,7 +53,7 @@ Function New-EXOSession
     Import-PSSession $EXOSession -AllowClobber -DisableNameChecking | out-null
 }
 
-#Function to compress the CSV file (ps 4.0)
+#Function to compress file (ps 4.0)
 Function New-ZipFile
 {
 	[CmdletBinding()] 
