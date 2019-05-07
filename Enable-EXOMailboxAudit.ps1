@@ -90,6 +90,8 @@ Param(
 )
 
 $script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+#Import Functions
+. "$script_root\Functions.ps1"
 
 Stop-TxnLogging
 Clear-Host
@@ -120,8 +122,7 @@ if ($isAllGood -eq $false)
 }
 #----------------------------------------------------------------------------------------------------
 
-#Import Functions
-. "$script_root\Functions.ps1"
+
 
 #Set Paths-------------------------------------------------------------------------------------------
 $Today=Get-Date
