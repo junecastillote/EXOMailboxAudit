@@ -86,7 +86,7 @@ Param(
 
 		#Test Mode
 		[Parameter()]
-		[switch]$testMode        
+		[switch]$testMode
 )
 
 $script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
