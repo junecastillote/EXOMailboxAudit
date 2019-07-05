@@ -51,14 +51,10 @@ Param(
 
         #path to the output directory (eg. c:\scripts\output)
         [Parameter(Mandatory=$true,Position=1)]
-		[string]$outputDirectory,
-		
-		#limit the result
-        [Parameter(Mandatory=$true,position=2)]
-		$resultSizeLimit,
-		
-		[Parameter(Mandatory=$true,position=3)]
-		$AuditLogAgeLimit,
+		[string]$outputDirectory=(Split-Path -Parent -Path $MyInvocation.MyCommand.Definition)+"\Output",
+			
+		[Parameter()]
+		$AuditLogAgeLimit=180,
 
         #path to the log directory (eg. c:\scripts\logs)
         [Parameter()]
