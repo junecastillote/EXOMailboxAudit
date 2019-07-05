@@ -27,9 +27,6 @@ $removeOldFiles = 60
 #8. Do you want to send the email summary? $true or $false
 $sendEmail = $true
 
-#9. If you want to test only or set specific result count, change this to any value other than Unlimited.
-$resultSizeLimit = "Unlimited"
-
 #10. Audit Log Age Limit
 $AuditLogAgeLimit = 180
 
@@ -52,7 +49,6 @@ $params = @{
     recipients = $recipients
     removeOldFiles = $removeOldFiles
     sendEmail = $sendEmail
-    resultSizeLimit = $resultSizeLimit
     AuditLogAgeLimit = $AuditLogAgeLimit
     exclusionList = $exclusionList
     testMode = $testMode

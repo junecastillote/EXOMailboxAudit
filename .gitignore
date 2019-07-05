@@ -4,3 +4,5 @@ output*.csv
 output*.txt
 exclusionList.txt
 *.xml
+Main.ps1
+Main.ps1

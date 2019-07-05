@@ -62,7 +62,7 @@ Param(
 
         #path to the log directory (eg. c:\scripts\logs)
         [Parameter()]
-        [string]$logDirectory,
+        [string]$logDirectory=(Split-Path -Parent -Path $MyInvocation.MyCommand.Definition)+"\Logs",
         
         #Sender Email Address
         [Parameter()]
@@ -180,7 +180,7 @@ $tenantName = (Get-OrganizationConfig).DisplayName
 
 #Get all mailboxes with disabled auditing
 Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ': Retrieving Mailbox List... ' -ForegroundColor Yellow
-$mailboxes = Get-Mailbox -ResultSize $resultSizeLimit -Filter {(RecipientTypeDetails -eq "UserMailbox" -or RecipientTypeDetails -eq "SharedMailbox" -or RecipientTypeDetails -eq "RoomMailbox" -or RecipientTypeDetails -eq "DiscoveryMailbox") -and (AuditEnabled -eq $false)} | Sort-Object PrimarySMTPAddress
+$mailboxes = Get-Mailbox -Filter {(RecipientTypeDetails -eq "UserMailbox" -or RecipientTypeDetails -eq "SharedMailbox" -or RecipientTypeDetails -eq "RoomMailbox" -or RecipientTypeDetails -eq "DiscoveryMailbox") -and (AuditEnabled -eq $false)} | Sort-Object PrimarySMTPAddress
 $mailboxCount = ($mailboxes | Measure-Object).Count
 Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Found $($mailboxCount) with audit logs disabled" -ForegroundColor Yellow
 if ($exclusionList) {
