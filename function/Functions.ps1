@@ -39,38 +39,6 @@
 
 #>
 
-#Function to connect to EXO Shell
-Function New-EXOSession
-{
-    [CmdletBinding()]
-    param(
-        [parameter(mandatory=$true,position=0)]
-        [PSCredential] $exoCredential
-    )
-
-    Get-PSSession | Remove-PSSession -Confirm:$false
-    $EXOSession = New-PSSession -ConfigurationName "Microsoft.Exchange" -ConnectionUri 'https://ps.outlook.com/powershell' -Credential $exoCredential -Authentication Basic -AllowRedirection -WarningAction SilentlyContinue
-    Import-PSSession $EXOSession -AllowClobber -DisableNameChecking | out-null
-}
-
-#Function to compress file (ps 4.0)
-Function New-ZipFile
-{
-	[CmdletBinding()]
-    param ( 
-        [Parameter(Mandatory=$true,position=0)] 
-        [string]$fileToZip,    
-        
-        [Parameter(Mandatory=$true,position=1)]
-        [string]$destinationZip
-	)
-	Add-Type -assembly System.IO.Compression
-	Add-Type -assembly System.IO.Compression.FileSystem
-	[System.IO.Compression.ZipArchive]$outZipFile = [System.IO.Compression.ZipFile]::Open($destinationZip, ([System.IO.Compression.ZipArchiveMode]::Create))
-	[System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($outZipFile, $fileToZip, (Split-Path $fileToZip -Leaf)) | out-null
-	$outZipFile.Dispose()
-}
-
 #Function to delete old files based on age
 Function Invoke-Housekeeping
 {
