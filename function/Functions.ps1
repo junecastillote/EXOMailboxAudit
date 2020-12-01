@@ -56,7 +56,7 @@ Function New-EXOSession
 #Function to compress file (ps 4.0)
 Function New-ZipFile
 {
-	[CmdletBinding()] 
+	[CmdletBinding()]
     param ( 
         [Parameter(Mandatory=$true,position=0)] 
         [string]$fileToZip,    
@@ -90,7 +90,7 @@ Function Invoke-Housekeeping
 		foreach ($file in $filesToDelete) {
             Remove-Item -Path ($file.FullName) -Force -ErrorAction SilentlyContinue
 		}
-	}	
+	}
 }
 
 #Function to Stop Transaction Logging
