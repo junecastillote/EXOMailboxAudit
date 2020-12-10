@@ -7,38 +7,38 @@ Function Enable-MailboxAuditLog {
         # OR created an encrypted XML (Get-Credential | export-clixml <file.xml>)
         # then use parameter like so: -adminCredential (import-clixml <file.xml>)
         [Parameter()]
-        [pscredential]$adminCredential,
+        [pscredential]$AdminCredential,
 
         #path to the output directory (eg. c:\scripts\output)
         [Parameter()]
-        [string]$outputDirectory = (($env:temp) + "\ExoMailboxAudit\Output"),
+        [string]$OutputDirectory = (($env:temp) + "\ExoMailboxAudit\Output"),
 			
         [Parameter()]
         $AuditLogAgeLimit = 180,
 
         #path to the log directory (eg. c:\scripts\logs)
         [Parameter()]
-        [string]$logDirectory = (($env:temp) + "\ExoMailboxAudit\Logs"),
+        [string]$LogDirectory = (($env:temp) + "\ExoMailboxAudit\Logs"),
 
         #Switch to enable email report
         [Parameter()]
-        [switch]$sendEmail,
+        [switch]$SendEmail,
         
         #Sender Email Address
         [Parameter()]
-        [string]$senderAddress,
+        [string]$SenderAddress,
 
         #Recipient Email Addresses - separate with comma
         [Parameter()]
-        [string[]]$recipientAddress,
+        [string[]]$RecipientAddress,
 
         #SMTP Server
         [Parameter()]
-        [string]$smtpServer,
+        [string]$SmtpServer,
 
         #SMTP Server Port
         [Parameter()]
-        [string]$smtpPort = 25,
+        [string]$SmtpPort = 25,
 
         # SMTP Server relay credential (if required)
         # you can pass the credential using variable ($smtpCredential = Get-Credential)
@@ -46,42 +46,46 @@ Function Enable-MailboxAuditLog {
         # OR created an encrypted XML (Get-Credential | export-clixml <file.xml>)
         # then use parameter like so: -smtpCredential (import-clixml <file.xml>)
         [Parameter()]
-        [pscredential]$smtpCredential,
+        [pscredential]$SmtpCredential,
 
         #SMTP Server credential
         [Parameter()]
-        [switch]$smtpSSL,
+        [switch]$SmtpSSL,
 
         #Delete older files (in days)
         [Parameter()]
-        [int]$removeOldFiles,
+        [int]$RemoveOldFiles,
 		
         #Exclusion List
         [Parameter()]
-        [string[]]$exclusionList,
+        [string[]]$ExclusionList,
 
         #Test Mode
         [Parameter()]
-        [switch]$testMode,
+        [switch]$TestMode,
 
         #Use if you want to skip connecting to Exchange PowerShell (if already connected)
         [Parameter()]
-        [switch]$skipConnect
-    )
+        [switch]$SkipConnect,
 
-    # $script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-    # #Import Functions
-    # . "$script_root\Functions.ps1"
+        #Use if you want to force update the audit set for all target mailbox
+        [Parameter()]
+        [switch]$ForceUpdate,
+
+        #Use if you want to include group mailbox types
+        [Parameter()]
+        [switch]$IncludeGroupMailbox
+    )
 
     Stop-TxnLogging
     Clear-Host
-    # $scriptInfo = Test-ScriptFileInfo -Path $MyInvocation.MyCommand.Definition
+
     $scriptInfo = Get-Module EXOMailboxAudit
 
     #Set Paths-------------------------------------------------------------------------------------------
     $Today = Get-Date
     [string]$fileSuffix = '{0:dd-MMM-yyyy_hh-mm_tt}' -f $Today
-    $logFile = "$($logDirectory)\Log_$($fileSuffix).txt"
+    $logFile = "$($logDirectory)\Enable_Log_$($fileSuffix).txt"
 
     #Create folders if not found
     if ($logDirectory) {
@@ -138,7 +142,7 @@ Function Enable-MailboxAuditLog {
             try {
                 #open new Exchange Online Session
                 Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ': Login to Exchange Online... ')
-                Connect-ExchangeOnline -Credential $adminCredential
+                Connect-ExchangeOnline -Credential $adminCredential -ShowBanner:$false
             }
             catch {
                 Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": There was an error connecting to Exchange Online. Terminating Script")
@@ -166,13 +170,28 @@ Function Enable-MailboxAuditLog {
         $ErrorActionPreference = $eap
         return $null
     }
-    # Write-Verbose 'Hello'
 
-    # Get all mailboxes with disabled auditing
+    # Get target mailbox
     Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ': Retrieving Mailbox List... ')
-    $mailboxes = Get-Mailbox -Filter { (RecipientTypeDetails -eq "UserMailbox" -or RecipientTypeDetails -eq "SharedMailbox" -or RecipientTypeDetails -eq "RoomMailbox" -or RecipientTypeDetails -eq "DiscoveryMailbox") -and (AuditEnabled -eq $false) } | Select-Object PrimarySMTPAddress | Sort-Object PrimarySMTPAddress
+    if ($ForceUpdate) {
+        Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Force Update all mailbox is enabled")
+        $mailboxes = @()
+        $mailboxes += Get-Mailbox -ResultSize Unlimited | Select-Object PrimarySMTPAddress,RecipientTypeDetails
+        if ($IncludeGroupMailbox) {
+            $mailboxes += Get-Mailbox -GroupMailbox -ResultSize Unlimited | Select-Object PrimarySMTPAddress,RecipientTypeDetails
+        }
+    }
+    else {
+        Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Get all mailbox with audit disabled")
+        $mailboxes = @()
+        $mailboxes += Get-Mailbox -ResultSize Unlimited -Filter { AuditEnabled -eq $false } | Select-Object PrimarySMTPAddress,RecipientTypeDetails
+        if ($IncludeGroupMailbox) {
+            $mailboxes += Get-Mailbox -GroupMailbox -ResultSize Unlimited -Filter { AuditEnabled -eq $false } | Select-Object PrimarySMTPAddress,RecipientTypeDetails
+        }
+    }
+
     $mailboxCount = ($mailboxes | Measure-Object).Count
-    Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Found $($mailboxCount) with audit logs disabled")
+    Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Found $($mailboxCount) mailbox")
     if ($exclusionList) {
         Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Found $($exclusionList.count) from the Exclusion List")
     }
@@ -180,10 +199,8 @@ Function Enable-MailboxAuditLog {
     $includedMailbox = 0
     if ($mailboxes) {
 
-        $outputFile = "$($outputDirectory)\output_$($fileSuffix).txt"
+        $outputFile = "$($outputDirectory)\enable_output_$($fileSuffix).txt"
         Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Saving Mailbox List to $($outputFile)")
-        #$mailboxes | Select-Object PrimarySMTPAddress | export-csv -nti $outputFile
-
         Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Enable Mailbox Auditing")
 
         foreach ($mailbox in $mailboxes) {
@@ -194,7 +211,12 @@ Function Enable-MailboxAuditLog {
                 Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ":          -->> $($mailbox.PrimarySMTPAddress)")
 
                 if (!$testMode) {
-                    Set-Mailbox $mailbox.PrimarySMTPAddress -AuditEnabled $true -AuditLogAgeLimit $AuditLogAgeLimit -AuditAdmin Update, MoveToDeletedItems, SoftDelete, HardDelete, SendAs, SendOnBehalf, Create, UpdateFolderPermission -AuditDelegate Update, SoftDelete, HardDelete, SendAs, Create, UpdateFolderPermissions, MoveToDeletedItems, SendOnBehalf -AuditOwner UpdateFolderPermission, MailboxLogin, Create, SoftDelete, HardDelete, Update, MoveToDeletedItems
+                    if ($mailbox.RecipientTypeDetails -eq 'GroupMailbox') {
+                        Set-Mailbox $mailbox.PrimarySMTPAddress -GroupMailbox -AuditEnabled $true -AuditLogAgeLimit $AuditLogAgeLimit -DefaultAuditSet admin,delegate,owner
+                    }
+                    else {
+                        Set-Mailbox $mailbox.PrimarySMTPAddress -AuditEnabled $true -AuditLogAgeLimit $AuditLogAgeLimit -DefaultAuditSet admin,delegate,owner
+                    }
                 }
                 $mailbox.PrimarySMTPAddress | Out-File $outputFile -Append
                 $includedMailbox = $includedMailbox + 1
