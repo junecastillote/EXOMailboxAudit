@@ -1,6 +1,6 @@
 $params = @{
-    #outputDirectory = ''
-    #logDirectory = ''
+    # outputDirectory = ''
+    # logDirectory = ''
     adminCredential = (Import-Clixml (($env:temp) + "\ExoMailboxAudit\adminCredential.xml"))
     senderAddress = 'june@poshlab.ml'
     recipientAddress = @('june.castillote@gmail.com')
@@ -10,16 +10,18 @@ $params = @{
     smtpPort = 587
     smtpCredential = (Import-Clixml (($env:temp) + "\ExoMailboxAudit\adminCredential.xml"))
     smtpSSL = $true
-    AuditLogAgeLimit = 180
+    AuditLogAgeLimit = 60
     # exclusionList = @()
-    skipConnect = $true
-    testMode = $false
+    skipConnect = $false
+    testMode = $true
     Verbose = $true
     forceupdate = $false
     includegroupmailbox = $true
 }
 
 Remove-Module EXOMailboxAudit -ErrorAction SilentlyContinue
-Import-Module .\EXOMailboxAudit.psd1
-Enable-MailboxAuditLog @params
-# Get-PSSession -Name ExchangeOnline* | ForEach-Object {$null = Disconnect-ExchangeOnline -Confirm:$false}
+# $moduleRoot = (resolve-path $PSScriptRoot\..).Path
+# & $moduleRoot\install.ps1 -ForceInstall
+Import-Module EXOMailboxAudit
+Enable-DefaultMailboxAuditLogSet @params
+Get-PSSession -Name ExchangeOnline* | ForEach-Object {$null = Disconnect-ExchangeOnline -Confirm:$false}

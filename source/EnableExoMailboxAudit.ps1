@@ -1,5 +1,6 @@
-Function Enable-MailboxAuditLog {
+Function Enable-DefaultMailboxAuditLogSet {
     [cmdletbinding()]
+    [Alias('edma')]
     Param(
         # office 365 admin credential
         # you can pass the credential using variable ($adminCredential = Get-Credential)
@@ -14,7 +15,7 @@ Function Enable-MailboxAuditLog {
         [string]$OutputDirectory = (($env:temp) + "\ExoMailboxAudit\Output"),
 			
         [Parameter()]
-        $AuditLogAgeLimit = 180,
+        $AuditLogAgeLimit = 60,
 
         #path to the log directory (eg. c:\scripts\logs)
         [Parameter()]
@@ -23,7 +24,7 @@ Function Enable-MailboxAuditLog {
         #Switch to enable email report
         [Parameter()]
         [switch]$SendEmail,
-        
+
         #Sender Email Address
         [Parameter()]
         [string]$SenderAddress,
@@ -105,6 +106,12 @@ Function Enable-MailboxAuditLog {
     }
     #----------------------------------------------------------------------------------------------------
 
+    if ($PSBoundParameters.Count -eq 0) {
+        Write-Output "You did not specify any paramaters. Terminating script."
+        Stop-TxnLogging
+        return $null
+    }
+
     #parameter check ----------------------------------------------------------------------------------------------------
     $isAllGood = $true
 
@@ -152,6 +159,7 @@ Function Enable-MailboxAuditLog {
         }
         else {
             Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ': The administrator credential is not provided. Use the -adminCredential parameter to specify the administrator login')
+            Stop-TxnLogging
             return $null
         }
     }

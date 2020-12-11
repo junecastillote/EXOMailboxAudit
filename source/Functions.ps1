@@ -84,5 +84,5 @@ Function Start-TxnLogging
         [string]$logDirectory
     )
 	Stop-TxnLogging
-    Start-Transcript $logDirectory -Append
+    $null = Start-Transcript $logDirectory -Append
 }

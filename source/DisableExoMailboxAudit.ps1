@@ -1,5 +1,6 @@
-Function Disable-MailboxAuditLog {
+Function Disable-DefaultMailboxAuditLogSet {
     [cmdletbinding()]
+    [Alias('ddma')]
     Param(
         # office 365 admin credential
         # you can pass the credential using variable ($adminCredential = Get-Credential)
@@ -69,6 +70,16 @@ Function Disable-MailboxAuditLog {
     }
     #----------------------------------------------------------------------------------------------------
 
+    if ($PSBoundParameters.count -eq 0) {
+        Write-Output "You did not specify any paramaters. Terminating script."
+        Stop-TxnLogging
+        return $null
+    }
+
+    if ($testMode) {
+        Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ': TEST MODE ')
+    }
+
     # Connect to O365 Shell
     if (!$skipConnect) {
         if ($adminCredential) {
@@ -85,6 +96,7 @@ Function Disable-MailboxAuditLog {
         }
         else {
             Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ': The administrator credential is not provided. Use the -adminCredential parameter to specify the administrator login')
+            Stop-TxnLogging
             return $null
         }
     }
