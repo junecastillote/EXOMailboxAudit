@@ -77,7 +77,7 @@ Function Disable-DefaultMailboxAuditLogSet {
     }
 
     if ($testMode) {
-        Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ': TEST MODE ')
+        Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ': TEST MODE ')
     }
 
     # Connect to O365 Shell
@@ -85,17 +85,17 @@ Function Disable-DefaultMailboxAuditLogSet {
         if ($adminCredential) {
             try {
                 #open new Exchange Online Session
-                Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ': Login to Exchange Online... ')
+                Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ': Login to Exchange Online... ')
                 Connect-ExchangeOnline -Credential $adminCredential -ShowBanner:$false
             }
             catch {
-                Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": There was an error connecting to Exchange Online. Terminating Script")
+                Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": There was an error connecting to Exchange Online. Terminating Script")
                 Stop-TxnLogging
                 return $null
             }
         }
         else {
-            Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ': The administrator credential is not provided. Use the -adminCredential parameter to specify the administrator login')
+            Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ': The administrator credential is not provided. Use the -adminCredential parameter to specify the administrator login')
             Stop-TxnLogging
             return $null
         }
@@ -110,68 +110,76 @@ Function Disable-DefaultMailboxAuditLogSet {
         $ErrorActionPreference = $eap
     }
     catch {
-        Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Make sure to connect to Exchange Online first. Terminating Script")
+        Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Make sure to connect to Exchange Online first. Terminating Script")
         Stop-TxnLogging
         $ErrorActionPreference = $eap
         return $null
     }
 
     # Get target mailbox
-    Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ': Retrieving Mailbox List... ')
+    Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ': Retrieving Mailbox List... ')
     if ($ForceUpdate) {
-        Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Force Update all mailbox is enabled")
+        Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Force Update all mailbox is enabled")
         $mailboxes = @()
-        $mailboxes += Get-Mailbox -ResultSize Unlimited | Select-Object PrimarySMTPAddress,RecipientTypeDetails
+        $mailboxes += Get-Mailbox -ResultSize Unlimited | Select-Object PrimarySMTPAddress, RecipientTypeDetails
         if ($IncludeGroupMailbox) {
-            $mailboxes += Get-Mailbox -GroupMailbox -ResultSize Unlimited | Select-Object PrimarySMTPAddress,RecipientTypeDetails
+            $mailboxes += Get-Mailbox -GroupMailbox -ResultSize Unlimited | Select-Object PrimarySMTPAddress, RecipientTypeDetails
         }
     }
     else {
-        Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Get all mailbox with audit enabled")
+        Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Get all mailbox with audit enabled")
         $mailboxes = @()
-        $mailboxes += Get-Mailbox -ResultSize Unlimited -Filter { AuditEnabled -eq $true } | Select-Object PrimarySMTPAddress,RecipientTypeDetails
+        $mailboxes += Get-Mailbox -ResultSize Unlimited -Filter { AuditEnabled -eq $true } | Select-Object PrimarySMTPAddress, RecipientTypeDetails
         if ($IncludeGroupMailbox) {
-            $mailboxes += Get-Mailbox -GroupMailbox -ResultSize Unlimited -Filter { AuditEnabled -eq $true } | Select-Object PrimarySMTPAddress,RecipientTypeDetails
+            $mailboxes += Get-Mailbox -GroupMailbox -ResultSize Unlimited -Filter { AuditEnabled -eq $true } | Select-Object PrimarySMTPAddress, RecipientTypeDetails
         }
     }
 
     $mailboxCount = ($mailboxes | Measure-Object).Count
-    Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Found $($mailboxCount) mailbox")
+    Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Found $($mailboxCount) mailbox")
     if ($exclusionList) {
-        Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Found $($exclusionList.count) from the Exclusion List")
+        Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Found $($exclusionList.count) from the Exclusion List")
     }
 
     $includedMailbox = 0
     if ($mailboxes) {
 
         $outputFile = "$($outputDirectory)\disable_result_$($fileSuffix).txt"
-        Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Saving Mailbox List to $($outputFile)")
-        Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Disable Mailbox Auditing")
+        Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Saving Mailbox List to $($outputFile)")
+        Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Disable Mailbox Auditing")
 
         foreach ($mailbox in ($mailboxes | Sort-Object PrimarySMTPAddress)) {
             if ($exclusionList -and $exclusionList -contains "$($mailbox.PrimarySMTPAddress)") {
-                Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ":          -->> $($mailbox.PrimarySMTPAddress) -- EXCLUDE")
+                Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": [EXCLUDE] $($mailbox.PrimarySMTPAddress)")
             }
             else {
-                Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ":          -->> $($mailbox.PrimarySMTPAddress)")
+                try {
+                    Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": $($mailbox.PrimarySMTPAddress)")
 
-                if (!$testMode) {
-                    if ($mailbox.RecipientTypeDetails -eq 'GroupMailbox') {
-                        Set-Mailbox $mailbox.PrimarySMTPAddress -GroupMailbox -AuditEnabled $false -AuditAdmin None -AuditOwner None -AuditDelegate None -Confirm:$false -Force
+                    if (!$testMode) {
+                        if ($mailbox.RecipientTypeDetails -eq 'GroupMailbox') {
+                            Set-Mailbox $mailbox.PrimarySMTPAddress -GroupMailbox -AuditEnabled $false -AuditAdmin None -AuditOwner None -AuditDelegate None -Confirm:$false -Force -Erroraction STOP
+                            Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": [SUCCESS] $($mailbox.PrimarySMTPAddress)")
+                        }
+                        else {
+                            Set-Mailbox $mailbox.PrimarySMTPAddress -AuditEnabled $false -AuditAdmin None -AuditOwner None -AuditDelegate None -Confirm:$false -Force -Erroraction STOP
+                            Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": [SUCCESS] $($mailbox.PrimarySMTPAddress)")
+                        }
                     }
-                    else {
-                        Set-Mailbox $mailbox.PrimarySMTPAddress -AuditEnabled $false -AuditAdmin None -AuditOwner None -AuditDelegate None -Confirm:$false -Force
-                    }
+                    $mailbox.PrimarySMTPAddress | Out-File $outputFile -Append
+                    $includedMailbox = $includedMailbox + 1
                 }
-                $mailbox.PrimarySMTPAddress | Out-File $outputFile -Append
-                $includedMailbox = $includedMailbox + 1
+                catch {
+                    Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": [FAILED] $($mailbox.PrimarySMTPAddress)) | $($_.Exception.Message)")
+                }
+
             }
         }
     }
     #Invoke Housekeeping---------------------------------------------------------------------------------
     #if ($enableHousekeeping)
     if ($removeOldFiles) {
-        Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Deleting log files older than $($removeOldFiles) days")
+        Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Deleting log files older than $($removeOldFiles) days")
         Invoke-Housekeeping -folderPath $outputDirectory -daysToKeep $removeOldFiles
         Invoke-Housekeeping -folderPath $logDirectory -daysToKeep $removeOldFiles
     }

@@ -12,8 +12,6 @@ $params = @{
 }
 
 Remove-Module EXOMailboxAudit -ErrorAction SilentlyContinue
-# $moduleRoot = (resolve-path $PSScriptRoot\..).Path
-# & $moduleRoot\install.ps1 -ForceInstall
 Import-Module EXOMailboxAudit
 Disable-DefaultMailboxAuditLogSet @params
 Get-PSSession -Name ExchangeOnline* | ForEach-Object {$null = Disconnect-ExchangeOnline -Confirm:$false}
