@@ -86,7 +86,7 @@ Function Enable-DefaultMailboxAuditLogSet {
     #Set Paths-------------------------------------------------------------------------------------------
     $Today = Get-Date
     [string]$fileSuffix = '{0:dd-MMM-yyyy_hh-mm_tt}' -f $Today
-    $logFile = "$($logDirectory)\Enable_Log_$($fileSuffix).txt"
+    $logFile = "$($logDirectory)\enable_transcript_$($fileSuffix).txt"
 
     #Create folders if not found
     if ($logDirectory) {
@@ -207,11 +207,11 @@ Function Enable-DefaultMailboxAuditLogSet {
     $includedMailbox = 0
     if ($mailboxes) {
 
-        $outputFile = "$($outputDirectory)\enable_output_$($fileSuffix).txt"
+        $outputFile = "$($outputDirectory)\enable_result_$($fileSuffix).txt"
         Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Saving Mailbox List to $($outputFile)")
         Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Enable Mailbox Auditing")
 
-        foreach ($mailbox in $mailboxes) {
+        foreach ($mailbox in ($mailboxes | Sort-Object PrimarySMTPAddress)) {
             if ($exclusionList -and $exclusionList -contains "$($mailbox.PrimarySMTPAddress)") {
                 Write-Verbose ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ":          -->> $($mailbox.PrimarySMTPAddress) -- EXCLUDE")
             }
@@ -220,10 +220,10 @@ Function Enable-DefaultMailboxAuditLogSet {
 
                 if (!$testMode) {
                     if ($mailbox.RecipientTypeDetails -eq 'GroupMailbox') {
-                        Set-Mailbox $mailbox.PrimarySMTPAddress -GroupMailbox -AuditEnabled $true -AuditLogAgeLimit $AuditLogAgeLimit -DefaultAuditSet admin,delegate,owner
+                        Set-Mailbox $mailbox.PrimarySMTPAddress -GroupMailbox -AuditEnabled $true -AuditLogAgeLimit $AuditLogAgeLimit -DefaultAuditSet admin,delegate,owner -Confirm:$false -Force
                     }
                     else {
-                        Set-Mailbox $mailbox.PrimarySMTPAddress -AuditEnabled $true -AuditLogAgeLimit $AuditLogAgeLimit -DefaultAuditSet admin,delegate,owner
+                        Set-Mailbox $mailbox.PrimarySMTPAddress -AuditEnabled $true -AuditLogAgeLimit $AuditLogAgeLimit -DefaultAuditSet admin,delegate,owner -Confirm:$false -Force
                     }
                 }
                 $mailbox.PrimarySMTPAddress | Out-File $outputFile -Append
