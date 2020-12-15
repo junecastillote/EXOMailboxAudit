@@ -86,7 +86,7 @@ Function Enable-DefaultMailboxAuditLogSet {
     #Set Paths-------------------------------------------------------------------------------------------
     $Today = Get-Date
     [string]$fileSuffix = '{0:dd-MMM-yyyy_hh-mm_tt}' -f $Today
-    $logFile = "$($logDirectory)\enable_transcript_$($fileSuffix).txt"
+    $logFile = "$($logDirectory)\enable_transcript_$($fileSuffix).log"
 
     #Create folders if not found
     if ($logDirectory) {
@@ -207,8 +207,9 @@ Function Enable-DefaultMailboxAuditLogSet {
     $includedMailbox = 0
     if ($mailboxes) {
 
-        $outputFile = "$($outputDirectory)\enable_result_$($fileSuffix).txt"
+        $outputFile = "$($outputDirectory)\enable_result_$($fileSuffix).csv"
         Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Saving Mailbox List to $($outputFile)")
+        "EmailAddress`tResult`tError" | Out-File $outputFile
         Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Enable Mailbox Auditing")
 
         foreach ($mailbox in ($mailboxes | Sort-Object PrimarySMTPAddress)) {
@@ -228,14 +229,20 @@ Function Enable-DefaultMailboxAuditLogSet {
                             Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": [SUCCESS] $($mailbox.PrimarySMTPAddress)")
                         }
                     }
-                    $mailbox.PrimarySMTPAddress | Out-File $outputFile -Append
+                    "$($mailbox.PrimarySMTPAddress)`tSuccess`t" | Out-File $outputFile -Append
+
                     $includedMailbox = $includedMailbox + 1
                 }
                 catch {
                     Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": [FAILED] $($mailbox.PrimarySMTPAddress) | $($_.Exception.Message)")
+
+                    "$($mailbox.PrimarySMTPAddress)`tFailed`t$($_.Exception.Message)" | Out-File $outputFile -Append
+                    $includedMailbox = $includedMailbox + 1
                 }
             }
         }
+
+        # Get-Content $outputFile -raw | ConvertFrom-Csv | Export-Csv -Path $outputFile -Force
 
         if ($sendEmail -and $includedMailbox -gt 0) {
             $subject = "Enable Mailbox Audit Task"

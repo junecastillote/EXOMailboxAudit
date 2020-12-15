@@ -50,7 +50,7 @@ Function Disable-DefaultMailboxAuditLogSet {
     #Set Paths-------------------------------------------------------------------------------------------
     $Today = Get-Date
     [string]$fileSuffix = '{0:dd-MMM-yyyy_hh-mm_tt}' -f $Today
-    $logFile = "$($logDirectory)\disable_transcript_$($fileSuffix).txt"
+    $logFile = "$($logDirectory)\disable_transcript_$($fileSuffix).log"
 
     #Create folders if not found
     if ($logDirectory) {
@@ -144,8 +144,9 @@ Function Disable-DefaultMailboxAuditLogSet {
     $includedMailbox = 0
     if ($mailboxes) {
 
-        $outputFile = "$($outputDirectory)\disable_result_$($fileSuffix).txt"
+        $outputFile = "$($outputDirectory)\disable_result_$($fileSuffix).csv"
         Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Saving Mailbox List to $($outputFile)")
+        "EmailAddress`tResult`tError" | Out-File $outputFile
         Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": Disable Mailbox Auditing")
 
         foreach ($mailbox in ($mailboxes | Sort-Object PrimarySMTPAddress)) {
@@ -166,11 +167,13 @@ Function Disable-DefaultMailboxAuditLogSet {
                             Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": [SUCCESS] $($mailbox.PrimarySMTPAddress)")
                         }
                     }
-                    $mailbox.PrimarySMTPAddress | Out-File $outputFile -Append
+                    "$($mailbox.PrimarySMTPAddress)`tSuccess`t" | Out-File $outputFile -Append
                     $includedMailbox = $includedMailbox + 1
                 }
                 catch {
                     Write-Output ((get-date -Format "dd-MMM-yyyy hh:mm:ss tt") + ": [FAILED] $($mailbox.PrimarySMTPAddress)) | $($_.Exception.Message)")
+                    "$($mailbox.PrimarySMTPAddress)`tFailed`t$($_.Exception.Message)" | Out-File $outputFile -Append
+                    $includedMailbox = $includedMailbox + 1
                 }
 
             }
